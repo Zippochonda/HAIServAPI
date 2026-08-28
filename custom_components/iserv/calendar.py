@@ -37,13 +37,13 @@ class IServTimetableCalendar(CoordinatorEntity, CalendarEntity):
     def _get_ha_events(self) -> list[CalendarEvent]:
         ha_events = []
         timetable = self.coordinator.data.get("timetable", {})
-        now = dt_util.now()
-        monday = now.date() - timedelta(days=now.weekday())
         
-        for weekday_idx in range(5):
-            date_obj = monday + timedelta(days=weekday_idx)
-            lessons = timetable.get(weekday_idx, [])
-            
+        for date_str, lessons in timetable.items():
+            try:
+                date_obj = datetime.strptime(date_str, "%Y-%m-%d").date()
+            except ValueError:
+                continue
+
             for lesson in lessons:
                 try:
                     time_str = lesson.get("time", "")
