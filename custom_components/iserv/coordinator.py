@@ -39,44 +39,61 @@ class IServDataUpdateCoordinator(DataUpdateCoordinator):
         data = {}
         now = datetime.now()
 
-        # 1. Stundenplan (komplette Woche Mo-Fr)
+        # 1. Stundenplan (Aktuelle Woche + 3 Folgewochen = 4 Wochen gesamt)
         monday = now.date() - timedelta(days=now.weekday())
-        api_url = f"https://{self.host}/iserv/dieschulapp/api/1.0/current-timetable/"
-        params = {"date": monday.strftime("%Y-%m-%d"), "week": "true", "substitutions": "true"}
-        if self.course_filter:
-            params["filterBy"] = f"courseSubject.course:in({self.course_filter})"
-        
+        timetable = {}
+
         headers = {"X-Requested-With": "XMLHttpRequest", "Accept": "application/json, text/plain, */*"}
-        res = self.api._session.get(api_url, params=params, headers=headers)
-        
-        timetable = {i: [] for i in range(5)} # Index 0=Montag, 4=Freitag
-        if res.status_code == 200:
-            entries = res.json().get("entries", [])
-            for entry in entries:
-                weekday = entry.get("weekday")
-                if weekday is None or weekday > 4:
-                    continue
-                
-                slot = entry.get("timeTableSlot", {})
-                course = entry.get("courseSubject", {}).get("subject", {}).get("name", "Unbekannt")
-                room = entry.get("room", {}).get("name", "")
-                sub_type = entry.get("substitutionType")
-                
-                status = "REGULÄR"
-                if sub_type:
-                    status = "ENTFALL" if sub_type == "canceled" else "VERTRETUNG"
-                
-                timetable[weekday].append({
-                    "slot": slot.get("number", 0),
-                    "time": f"{slot.get('startTime', '')}-{slot.get('endTime', '')}",
-                    "course": course,
-                    "room": room,
-                    "status": status,
-                    "info": entry.get("message", "")
-                })
+
+        for week_offset in range(4):
+            current_monday = monday + timedelta(days=week_offset * 7)
+            api_url = f"https://{self.host}/iserv/dieschulapp/api/1.0/current-timetable/"
+            params = {
+                "date": current_monday.strftime("%Y-%m-%d"), 
+                "week": "true", 
+                "substitutions": "true"
+            }
+            if self.course_filter:
+                params["filterBy"] = f"courseSubject.course:in({self.course_filter})"
             
-            for day in range(5):
-                timetable[day].sort(key=lambda x: x["slot"])
+            res = self.api._session.get(api_url, params=params, headers=headers)
+            
+            if res.status_code == 200:
+                entries = res.json().get("entries", [])
+                for entry in entries:
+                    weekday = entry.get("weekday")
+                    if weekday is None or weekday > 4: # Ignoriere Wochenende
+                        continue
+                    
+                    # Berechne das exakte Datums-String für den Schlüssel
+                    lesson_date = current_monday + timedelta(days=weekday)
+                    date_str = lesson_date.strftime("%Y-%m-%d")
+
+                    if date_str not in timetable:
+                        timetable[date_str] = []
+
+                    slot = entry.get("timeTableSlot", {})
+                    course = entry.get("courseSubject", {}).get("subject", {}).get("name", "Unbekannt")
+                    room = entry.get("room", {}).get("name", "")
+                    sub_type = entry.get("substitutionType")
+                    
+                    status = "REGULÄR"
+                    if sub_type:
+                        status = "ENTFALL" if sub_type == "canceled" else "VERTRETUNG"
+                    
+                    timetable[date_str].append({
+                        "slot": slot.get("number", 0),
+                        "time": f"{slot.get('startTime', '')}-{slot.get('endTime', '')}",
+                        "course": course,
+                        "room": room,
+                        "status": status,
+                        "info": entry.get("message", "")
+                    })
+        
+        # Sortiere alle Stunden pro Tag chronologisch
+        for date_str in timetable:
+            timetable[date_str].sort(key=lambda x: x["slot"])
+            
         data["timetable"] = timetable
 
         # 2. Termine
