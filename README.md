@@ -79,7 +79,7 @@ content: >
     {% endfor %}
   {% else %}
     🎉 Heute kein Unterricht eingetragen!
-  {% endif %}
+  {% endif %}```
 
 ### 2. Ungelesene E-Mails Vorschau
 ```yaml
@@ -97,7 +97,7 @@ content: >
     {% endfor %}
   {% else %}
     Keine neuen E-Mails.
-  {% endif %}
+  {% endif %}```
 
 ### 🛠 Fehlerbehebung
 Invalid handler specified: Du hast vergessen, Home Assistant nach dem Herunterladen der Dateien neu zu starten. Bitte führe einen vollständigen Neustart durch.
