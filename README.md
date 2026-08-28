@@ -80,3 +80,31 @@ content: >
   {% else %}
     🎉 Heute kein Unterricht eingetragen!
   {% endif %}
+
+### 2. Ungelesene E-Mails Vorschau
+```yaml
+type: markdown
+title: 📧 Neue IServ E-Mails
+content: >
+  {% set emails = state_attr('sensor.iserv_max_mustermann_ungelesene_e_mails', 'emails') %}
+  
+  {% if emails and emails | length > 0 %}
+    {% for email in emails %}
+      **Von:** {{ email.sender }}
+      **Betreff:** {{ email.subject }}
+      *{{ email.body | truncate(100) }}*
+      ***
+    {% endfor %}
+  {% else %}
+    Keine neuen E-Mails.
+  {% endif %}
+
+### 🛠 Fehlerbehebung
+Invalid handler specified: Du hast vergessen, Home Assistant nach dem Herunterladen der Dateien neu zu starten. Bitte führe einen vollständigen Neustart durch.
+
+Keine Stundenplandaten: Prüfe, ob dein Kurs-Filter (falls angegeben) korrekte IDs enthält.
+
+IMAP / E-Mails werden nicht geladen: Stelle sicher, dass IMAP in deiner IServ-Instanz für deinen Account freigeschaltet ist und du das korrekte Passwort verwendest.
+
+🤝 Danksagung
+Diese Integration nutzt angepasste Teile der IServAPI https://github.com/Leo-Aqua/IServAPI für den Login und Datenabruf.
