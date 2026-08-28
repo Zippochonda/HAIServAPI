@@ -1,5 +1,4 @@
 from __future__ import annotations
-from turtle import st
 
 from .core import Core
 from .profile import Profile
