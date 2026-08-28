@@ -26,7 +26,9 @@ class IServTimetableSensor(CoordinatorEntity, SensorEntity):
         today_idx = dt_util.now().weekday()
         if today_idx > 4:
             return "Wochenende"
-        lessons = self.coordinator.data.get("timetable", {}).get(today_idx, [])
+        
+        today_str = dt_util.now().strftime("%Y-%m-%d")
+        lessons = self.coordinator.data.get("timetable", {}).get(today_str, [])
         return f"{len(lessons)} Stunden" if lessons else "Kein Unterricht"
 
     @property
