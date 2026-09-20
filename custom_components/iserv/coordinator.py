@@ -38,12 +38,11 @@ class IServDataUpdateCoordinator(DataUpdateCoordinator):
 
         data = {}
         now = datetime.now()
+        headers = {"X-Requested-With": "XMLHttpRequest", "Accept": "application/json, text/plain, */*"}
 
         # 1. Stundenplan (Aktuelle Woche + 3 Folgewochen = 4 Wochen gesamt)
         monday = now.date() - timedelta(days=now.weekday())
         timetable = {}
-
-        headers = {"X-Requested-With": "XMLHttpRequest", "Accept": "application/json, text/plain, */*"}
 
         for week_offset in range(4):
             current_monday = monday + timedelta(days=week_offset * 7)
@@ -67,7 +66,7 @@ class IServDataUpdateCoordinator(DataUpdateCoordinator):
                         continue
                         
                     weekday = entry.get("weekday")
-                    if weekday is None or weekday > 4: # Ignoriere Wochenende
+                    if weekday is None or weekday > 4:
                         continue
                     
                     lesson_date = current_monday + timedelta(days=weekday)
@@ -76,7 +75,6 @@ class IServDataUpdateCoordinator(DataUpdateCoordinator):
                     if date_str not in timetable:
                         timetable[date_str] = []
 
-                    # SICHERHEITS-FALLBACKS: "or {}" verhindert den 'NoneType' Fehler
                     slot = entry.get("timeTableSlot") or {}
                     course_sub = entry.get("courseSubject") or {}
                     subject = (course_sub.get("subject") or {}).get("name", "Unbekannt")
@@ -98,7 +96,6 @@ class IServDataUpdateCoordinator(DataUpdateCoordinator):
                         "info": entry.get("message") or ""
                     })
         
-        # Sortiere alle Stunden pro Tag chronologisch
         for date_str in timetable:
             timetable[date_str].sort(key=lambda x: x.get("slot", 0))
             
@@ -118,7 +115,25 @@ class IServDataUpdateCoordinator(DataUpdateCoordinator):
         except Exception:
             data["notifications"] = []
 
-        # 4. E-Mails via IMAP
+        # 4. Elternbriefe (Neu)
+        try:
+            letters_url = f"https://{self.host}/iserv/parental-letter/api/letters" 
+            res_letters = self.api._session.get(letters_url, headers=headers)
+            if res_letters.status_code == 200:
+                json_data = res_letters.json() or {}
+                if isinstance(json_data, dict):
+                    data["elternbriefe"] = json_data.get("data", json_data.get("letters", []))
+                elif isinstance(json_data, list):
+                    data["elternbriefe"] = json_data
+                else:
+                    data["elternbriefe"] = []
+            else:
+                data["elternbriefe"] = []
+        except Exception as e:
+            _LOGGER.warning("Fehler beim Abrufen der Elternbriefe: %s", e)
+            data["elternbriefe"] = []
+
+        # 5. E-Mails via IMAP
         emails = []
         try:
             mail = imaplib.IMAP4_SSL(self.host, 993)
