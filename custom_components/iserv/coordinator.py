@@ -59,22 +59,30 @@ class IServDataUpdateCoordinator(DataUpdateCoordinator):
             res = self.api._session.get(api_url, params=params, headers=headers)
             
             if res.status_code == 200:
-                entries = res.json().get("entries", [])
+                res_data = res.json() or {}
+                entries = res_data.get("entries") or []
+                
                 for entry in entries:
+                    if not isinstance(entry, dict):
+                        continue
+                        
                     weekday = entry.get("weekday")
                     if weekday is None or weekday > 4: # Ignoriere Wochenende
                         continue
                     
-                    # Berechne das exakte Datums-String für den Schlüssel
                     lesson_date = current_monday + timedelta(days=weekday)
                     date_str = lesson_date.strftime("%Y-%m-%d")
 
                     if date_str not in timetable:
                         timetable[date_str] = []
 
-                    slot = entry.get("timeTableSlot", {})
-                    course = entry.get("courseSubject", {}).get("subject", {}).get("name", "Unbekannt")
-                    room = entry.get("room", {}).get("name", "")
+                    # SICHERHEITS-FALLBACKS: "or {}" verhindert den 'NoneType' Fehler
+                    slot = entry.get("timeTableSlot") or {}
+                    course_sub = entry.get("courseSubject") or {}
+                    subject = (course_sub.get("subject") or {}).get("name", "Unbekannt")
+                    room_data = entry.get("room") or {}
+                    room = room_data.get("name", "")
+                    
                     sub_type = entry.get("substitutionType")
                     
                     status = "REGULÄR"
@@ -84,15 +92,15 @@ class IServDataUpdateCoordinator(DataUpdateCoordinator):
                     timetable[date_str].append({
                         "slot": slot.get("number", 0),
                         "time": f"{slot.get('startTime', '')}-{slot.get('endTime', '')}",
-                        "course": course,
+                        "course": subject,
                         "room": room,
                         "status": status,
-                        "info": entry.get("message", "")
+                        "info": entry.get("message") or ""
                     })
         
         # Sortiere alle Stunden pro Tag chronologisch
         for date_str in timetable:
-            timetable[date_str].sort(key=lambda x: x["slot"])
+            timetable[date_str].sort(key=lambda x: x.get("slot", 0))
             
         data["timetable"] = timetable
 
