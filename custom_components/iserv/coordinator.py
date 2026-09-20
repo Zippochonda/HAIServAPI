@@ -115,17 +115,22 @@ class IServDataUpdateCoordinator(DataUpdateCoordinator):
         except Exception:
             data["notifications"] = []
 
-        # 4. Elternbriefe (Neu)
+        # 4. Elternbriefe
         try:
-            letters_url = f"https://{self.host}/iserv/parental-letter/api/letters" 
+            # URL auf die lokale IServ Adresse aktualisiert
+            letters_url = f"https://{self.host}/iserv/parentletter/parent/index" 
             res_letters = self.api._session.get(letters_url, headers=headers)
             if res_letters.status_code == 200:
-                json_data = res_letters.json() or {}
-                if isinstance(json_data, dict):
-                    data["elternbriefe"] = json_data.get("data", json_data.get("letters", []))
-                elif isinstance(json_data, list):
-                    data["elternbriefe"] = json_data
-                else:
+                try:
+                    json_data = res_letters.json() or {}
+                    if isinstance(json_data, dict):
+                        data["elternbriefe"] = json_data.get("data", json_data.get("letters", []))
+                    elif isinstance(json_data, list):
+                        data["elternbriefe"] = json_data
+                    else:
+                        data["elternbriefe"] = []
+                except Exception:
+                    _LOGGER.warning("Elternbriefe-URL liefert kein JSON. Möglicherweise ist es eine HTML-Seite.")
                     data["elternbriefe"] = []
             else:
                 data["elternbriefe"] = []
