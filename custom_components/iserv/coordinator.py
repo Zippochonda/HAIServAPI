@@ -115,27 +115,31 @@ class IServDataUpdateCoordinator(DataUpdateCoordinator):
         except Exception:
             data["notifications"] = []
 
-        # 4. Elternbriefe
+        # 4. Elternbriefe (Neu gefiltert aus der v1 Notification API, wie in der HAR-Datei gefunden)
         try:
-            # URL auf die lokale IServ Adresse aktualisiert
-            letters_url = f"https://{self.host}/iserv/parentletter/parent/index" 
+            letters_url = f"https://{self.host}/iserv/notification/api/v1/notifications"
             res_letters = self.api._session.get(letters_url, headers=headers)
+            
             if res_letters.status_code == 200:
-                try:
-                    json_data = res_letters.json() or {}
-                    if isinstance(json_data, dict):
-                        data["elternbriefe"] = json_data.get("data", json_data.get("letters", []))
-                    elif isinstance(json_data, list):
-                        data["elternbriefe"] = json_data
-                    else:
-                        data["elternbriefe"] = []
-                except Exception:
-                    _LOGGER.warning("Elternbriefe-URL liefert kein JSON. Möglicherweise ist es eine HTML-Seite.")
-                    data["elternbriefe"] = []
+                json_data = res_letters.json() or {}
+                notifications = []
+                
+                if isinstance(json_data.get("data"), dict):
+                    notifications = json_data["data"].get("notifications", [])
+                elif isinstance(json_data.get("notifications"), list):
+                    notifications = json_data["notifications"]
+                elif isinstance(json_data, list):
+                    notifications = json_data
+                
+                # Filtere alle Benachrichtigungen heraus, die den Typ oder die Gruppe "parentletter" haben
+                data["elternbriefe"] = [
+                    n for n in notifications 
+                    if isinstance(n, dict) and (n.get("type") == "parentletter" or n.get("groupId") == "parentletter")
+                ]
             else:
                 data["elternbriefe"] = []
         except Exception as e:
-            _LOGGER.warning("Fehler beim Abrufen der Elternbriefe: %s", e)
+            _LOGGER.warning("Fehler beim Abrufen der Elternbriefe über die Notification API: %s", e)
             data["elternbriefe"] = []
 
         # 5. E-Mails via IMAP
