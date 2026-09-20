@@ -20,12 +20,12 @@ async def async_setup_entry(hass, entry, async_add_entities):
         IServDaysUntilExamSensor(coordinator, entry),
         IServWeeklyPlanSensor(coordinator, entry),
         IServFeatureSensor(coordinator, entry, "notifications", "Benachrichtigungen", "mdi:bell"),
-        IServMailSensor(coordinator, entry)
+        IServMailSensor(coordinator, entry),
+        IServParentalLettersSensor(coordinator, entry)
     ]
     async_add_entities(entities)
 
 
-# --- Hilfsfunktion für Kalender-Events ---
 def _get_parsed_events(coordinator):
     events = coordinator.data.get("events", [])
     parsed = []
@@ -39,7 +39,6 @@ def _get_parsed_events(coordinator):
     return sorted(parsed, key=lambda x: x["start"])
 
 
-# 1. Aktuelle Stunde
 class IServCurrentLessonSensor(CoordinatorEntity, SensorEntity):
     def __init__(self, coordinator, entry):
         super().__init__(coordinator)
@@ -81,7 +80,6 @@ class IServCurrentLessonSensor(CoordinatorEntity, SensorEntity):
             return "Unbekannt"
 
 
-# 2. Arbeiten (Klausuren)
 class IServExamsSensor(CoordinatorEntity, SensorEntity):
     def __init__(self, coordinator, entry):
         super().__init__(coordinator)
@@ -103,7 +101,6 @@ class IServExamsSensor(CoordinatorEntity, SensorEntity):
         return {"arbeiten": [e["title"] for e in events if e["is_exam"] and e["start"].date() >= now.date()]}
 
 
-# 3. Noten Gesamt
 class IServGradesSensor(CoordinatorEntity, SensorEntity):
     def __init__(self, coordinator, entry):
         super().__init__(coordinator)
@@ -116,7 +113,6 @@ class IServGradesSensor(CoordinatorEntity, SensorEntity):
         return "Unbekannt"
 
 
-# 4. Schultermine (Alle Events außer Arbeiten)
 class IServSchoolEventsSensor(CoordinatorEntity, SensorEntity):
     def __init__(self, coordinator, entry):
         super().__init__(coordinator)
@@ -132,7 +128,6 @@ class IServSchoolEventsSensor(CoordinatorEntity, SensorEntity):
         return len(upcoming_events) if upcoming_events else "Aus"
 
 
-# 5. Stundenplan Änderungen (Heute)
 class IServTimetableChangesSensor(CoordinatorEntity, SensorEntity):
     def __init__(self, coordinator, entry):
         super().__init__(coordinator)
@@ -148,7 +143,6 @@ class IServTimetableChangesSensor(CoordinatorEntity, SensorEntity):
         return changes
 
 
-# 6 & 7. Stundenplan Heute / Morgen (Zusammenfassung)
 class IServTimetableSummarySensor(CoordinatorEntity, SensorEntity):
     def __init__(self, coordinator, entry, day_offset, name):
         super().__init__(coordinator)
@@ -175,7 +169,6 @@ class IServTimetableSummarySensor(CoordinatorEntity, SensorEntity):
         return f"{changes} Änderungen"
 
 
-# 8. Tage bis nächste Arbeit
 class IServDaysUntilExamSensor(CoordinatorEntity, SensorEntity):
     def __init__(self, coordinator, entry):
         super().__init__(coordinator)
@@ -199,7 +192,6 @@ class IServDaysUntilExamSensor(CoordinatorEntity, SensorEntity):
         return "Unbekannt"
 
 
-# 9. Wochenplan JSON (Wie bei Schulmanager)
 class IServWeeklyPlanSensor(CoordinatorEntity, SensorEntity):
     def __init__(self, coordinator, entry):
         super().__init__(coordinator)
@@ -219,7 +211,6 @@ class IServWeeklyPlanSensor(CoordinatorEntity, SensorEntity):
         return {"timetable_data": self.coordinator.data.get("timetable", {})}
 
 
-# --- Vorhandene Sensoren (Benachrichtigungen & E-Mails) ---
 class IServFeatureSensor(CoordinatorEntity, SensorEntity):
     def __init__(self, coordinator, entry, data_key, name, icon):
         super().__init__(coordinator)
@@ -253,3 +244,25 @@ class IServMailSensor(CoordinatorEntity, SensorEntity):
     @property
     def extra_state_attributes(self):
         return {"emails": self.coordinator.data.get("emails", [])}
+
+
+class IServParentalLettersSensor(CoordinatorEntity, SensorEntity):
+    def __init__(self, coordinator, entry):
+        super().__init__(coordinator)
+        self._attr_name = f"{entry.title} Elternbriefe"
+        self._attr_unique_id = f"{entry.entry_id}_parental_letters"
+        self._attr_icon = "mdi:envelope-open-text-outline"
+
+    @property
+    def native_value(self):
+        letters = self.coordinator.data.get("elternbriefe", [])
+        
+        unread = [b for b in letters if isinstance(b, dict) and (b.get("read") is False or b.get("acknowledged") is False)]
+        if unread:
+            return f"{len(unread)} ungelesen"
+            
+        return len(letters) if letters else "Keine"
+
+    @property
+    def extra_state_attributes(self):
+        return {"briefe": self.coordinator.data.get("elternbriefe", [])}
